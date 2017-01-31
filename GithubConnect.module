@@ -1,0 +1,60 @@
+<?php namespace ProcessWire;
+
+/**
+ * GithubConnect
+ *
+ * See README.md for usage instructions.
+ *
+ * ProcessWire 3.x
+ * Licensed under GNU/GPL v2, see LICENSE.TXT
+ *
+ *
+ * @author Tabea David <info@justonestep.de>
+ * @version 0.0.1
+ * @copyright Copyright (c) 2017 justonestep.de, <info@justonestep.de>
+ * @see https://github.com/justonestep/processwire-githubconnect
+ * @see http://www.processwire.com
+ */
+
+/**
+ * Class GithubConnect
+ */
+class GithubConnect extends WireData implements Module, ConfigurableModule {
+
+  const API_AUTHORIZE = 'https://github.com/login/oauth/authorize';
+
+  /**
+   * Retrieves module meta data
+   * Implementation of the Module interface
+   *
+   * @return array
+   * @see http://processwire.com/apigen/class-Module.html
+   */
+  public static function getModuleInfo() {
+    return array(
+      'title' => 'Github Connect',
+      'summary' => 'ProcessWire module to connect a Github OAuth application. ',
+      'version' => 001,
+      'href' => 'https://github.com/justonestep/processwire-githubconnect',
+      'singular' => true,
+      'autoload' => true,
+      'icon' => 'github'
+    );
+  }
+
+  public function authorize() {
+    // An unguessable random string. It is used to protect against cross-site request forgery attacks.
+    $state = uniqid(); // @todo: save! to be able to compare with
+
+    $url = sprintf(
+      '%s?client_id=%s&redirect_uri=%s&state=%s',
+      self::API_AUTHORIZE, $this->data['clientId'], $this->data['redirectUri'], $state
+    );
+
+    return sprintf('<a href="%s" title="%s">%s</a>', $url, 'authorize', 'Authorize!');
+  }
+
+  // @todo
+  // compare state, save code, get and save access_token
+
+}
