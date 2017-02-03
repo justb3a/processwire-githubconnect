@@ -22,6 +22,7 @@
 class GithubConnect extends WireData implements Module, ConfigurableModule {
 
   const API_AUTHORIZE = 'https://github.com/login/oauth/authorize';
+  const API_ACCESS_TOKEN = 'https://github.com/login/oauth/access_token';
 
   /**
    * Retrieves module meta data
@@ -42,19 +43,71 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
     );
   }
 
+  /**
+   * 1. Redirect users to request GitHub access
+   * @see: https://developer.github.com/v3/oauth/
+   * If the user accepts your request, GitHub redirects back to your site
+   * with a temporary code in a code parameter as well as the state you provided.
+   */
   public function authorize() {
-    // An unguessable random string. It is used to protect against cross-site request forgery attacks.
-    $state = uniqid(); // @todo: save! to be able to compare with
+    // an unguessable random string
+    // it is used to protect against cross-site request forgery attacks
+    $state = uniqid();
 
-    $url = sprintf(
-      '%s?client_id=%s&redirect_uri=%s&state=%s',
-      self::API_AUTHORIZE, $this->data['clientId'], $this->data['redirectUri'], $state
+    $request = array(
+      'client_id' => $this->clientId,
+      'redirect_uri' => $this->redirectUri,
+      'state' => $state
     );
+
+    $url = self::API_AUTHORIZE . '?' . http_build_query($request);
+
+    // a code has been returnd successfully
+    if ($this->page->template->name === 'admin' && $this->input->get->code) {
+      $this->getAccessToken();
+    }
 
     return sprintf('<a href="%s" title="%s">%s</a>', $url, 'authorize', 'Authorize!');
   }
 
-  // @todo
-  // compare state, save code, get and save access_token
+  /*
+   * 2. GitHub redirects back to your site
+   * Request the access_token
+   *
+   * Now you need to exchange the code for an access token.
+   * You simply have to POST this code,
+   * along with some app identification parameters.
+   */
+  public function getAccessToken() {
+    $connection = new WireHttp;
+    $connection->setHeader('Accept', 'application/json');
 
+    $request = array(
+      'client_id' => $this->clientId,
+      'client_secret' => $this->clientSecret,
+      'code' => $this->input->get->code,
+      'redirect_uri' => $this->redirectUri,
+      'state' => $this->input->state
+    );
+
+    $data = $connection->post(self::API_ACCESS_TOKEN, $request);
+
+    if ($data) {
+      $result = json_decode($data, true);
+
+      if (isset($result['access_token'])) {
+        $data = $this->modules->getModuleConfigData($this->className());
+        $data['accessToken'] = $result['access_token'];
+        $this->modules->saveModuleConfigData($this->className(), $data);
+      } else {
+        $error = "[GithubConnect]: No access token could be received.";
+        if (isset($result['error'])) $error .= " Reason: `{$result['error']}` – {$result['error_description']}";
+
+        $this->log->save('errors', $error);
+        $this->error($error);
+      }
+
+      $this->session->redirect($this->redirectUri);
+    }
+  }
 }
