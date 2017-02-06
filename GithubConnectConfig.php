@@ -19,8 +19,12 @@ class GithubConnectConfig extends ModuleConfig {
       'clientId' => '',
       'clientSecret' => '',
       'redirectUri' => $redirectUri,
-      'cacheExpire' => 'daily',
-      'accessToken' => ''
+      'organization' => '',
+      'accessToken' => '',
+      'fieldSelect' => '',
+      'fieldPlain' => '',
+      'fieldTeaser' => '',
+      'fieldBody' => ''
     );
   }
 
@@ -31,9 +35,6 @@ class GithubConnectConfig extends ModuleConfig {
    * @return InputfieldWrapper
    */
   public function getInputfields() {
-    // get submitted data
-    $cacheExpire = isset($this->data['cacheExpire']) ? $this->data['cacheExpire'] : 'daily';
-
     $inputfields = parent::getInputfields();
     $redirectUri = $this->getDefaults()['redirectUri'];
     $link = $this->modules->get($this->getModuleName())->authorize();
@@ -50,6 +51,12 @@ class GithubConnectConfig extends ModuleConfig {
 EOD;
     $help->value = $helpContent;
     $inputfields->add($help);
+
+    // field organization
+    $field = $this->modules->get('InputfieldText');
+    $field->name = 'organization';
+    $field->label = __('Organization');
+    $inputfields->add($field);
 
     // field app ID
     $field = $this->modules->get('InputfieldText');
@@ -71,12 +78,11 @@ EOD;
     $field = $this->modules->get('InputfieldText');
     $field->name = 'redirectUri';
     $field->label = __('Authorization callback URL');
-    $field->required = 1;
     $field->collapsed = Inputfield::collapsedNoLocked;
     $field->columnWidth = 50;
     $inputfields->add($field);
 
-    // Access Token
+    // field Access Token
     $field = $this->modules->get('InputfieldText');
     $field->name = 'accessToken';
     $field->label = __('Github Access Token');
@@ -84,17 +90,61 @@ EOD;
     $field->collapsed = Inputfield::collapsedNoLocked;
     $inputfields->add($field);
 
-    // field cache ID
+    // field fieldSelect
     $field = $this->modules->get('InputfieldSelect');
-    $field->label = 'Cache expires';
-    $field->description = __('By default a cache lasts for one day. You could select another lifetime.');
-    $field->attr('name', 'cacheExpire');
-    $field->attr('value', $cacheExpire);
-    $field->columnWidth = 100;
+    $field->label = __('Select list Github repositories');
+    $field->description = __('Field which should be filled with Github repositories.');
+    $field->notes = __('Type Option, all fields must be added to the same template.');
+    $field->attr('name', 'fieldSelect');
+    $field->columnWidth = 25;
     $field->required = 1;
-    $lifetimes = array('never', 'save', 'now', 'hourly', 'daily', 'weekly', 'monthly');
-    foreach($lifetimes as $lifetime) {
-      $field->addOption($lifetime, $lifetime);
+    $field->requiredIf = "clientSecret!=''";
+    foreach ($this->fields as $f) {
+      if (!$f->type instanceof \ProcessWire\FieldtypeOptions) continue;
+      $field->addOption($f->name, $f->name);
+    }
+    $inputfields->add($field);
+
+    // field fieldPlain
+    $field = $this->modules->get('InputfieldSelect');
+    $field->label = __('Selected Github repository');
+    $field->description = __('Field which should store the selected Github repository.');
+    $field->notes = __('Type Text, all fields must be added to the same template.');
+    $field->attr('name', 'fieldPlain');
+    $field->columnWidth = 25;
+    $field->required = 1;
+    $field->requiredIf = "clientSecret!=''";
+    foreach ($this->fields as $f) {
+      if (!$f->type instanceof \ProcessWire\FieldtypeText || $f->type instanceof \ProcessWire\FieldtypeTextarea) continue;
+      $field->addOption($f->name, $f->name);
+    }
+    $inputfields->add($field);
+
+    // field fieldTeaser
+    $field = $this->modules->get('InputfieldSelect');
+    $field->label = __('Teaser Text');
+    $field->description = __('Field which should contain the imported `description` content.');
+    $field->notes = __('Type Textarea, all fields must be added to the same template.');
+    $field->attr('name', 'fieldTeaser');
+    $field->columnWidth = 25;
+    foreach ($this->fields as $f) {
+      if (!$f->type instanceof \ProcessWire\FieldtypeTextarea) continue;
+      $field->addOption($f->name, $f->name);
+    }
+    $inputfields->add($field);
+
+    // field fieldBody
+    $field = $this->modules->get('InputfieldSelect');
+    $field->label = __('Body Text');
+    $field->description = __('Field which should contain the imported `readme`-file content.');
+    $field->notes = __('Type Textarea, all fields must be added to the same template.');
+    $field->attr('name', 'fieldBody');
+    $field->columnWidth = 25;
+    $field->required = 1;
+    $field->requiredIf = "clientSecret!=''";
+    foreach ($this->fields as $f) {
+      if (!$f->type instanceof \ProcessWire\FieldtypeTextarea) continue;
+      $field->addOption($f->name, $f->name);
     }
     $inputfields->add($field);
 
