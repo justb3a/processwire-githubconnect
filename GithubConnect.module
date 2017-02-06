@@ -1,16 +1,11 @@
 <?php namespace ProcessWire;
 
 /**
- * GithubConnect
- *
- * See README.md for usage instructions.
- *
- * ProcessWire 3.x
+ * GithubConnect See README.md for usage instructions.  ProcessWire 3.x
  * Licensed under GNU/GPL v2, see LICENSE.TXT
  *
- *
  * @author Tabea David <info@justonestep.de>
- * @version 0.0.1
+ * @version 0.0.2
  * @copyright Copyright (c) 2017 justonestep.de, <info@justonestep.de>
  * @see https://github.com/justonestep/processwire-githubconnect
  * @see http://www.processwire.com
@@ -23,6 +18,8 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
 
   const API_AUTHORIZE = 'https://github.com/login/oauth/authorize';
   const API_ACCESS_TOKEN = 'https://github.com/login/oauth/access_token';
+  const API_REPOS = 'https://api.github.com/repos/';
+  const API_ORGS = 'https://api.github.com/orgs/%s/repos';
 
   /**
    * Retrieves module meta data
@@ -35,12 +32,83 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
     return array(
       'title' => 'Github Connect',
       'summary' => 'ProcessWire module to connect a Github OAuth application. ',
-      'version' => 001,
+      'version' => 002,
       'href' => 'https://github.com/justonestep/processwire-githubconnect',
       'singular' => true,
       'autoload' => true,
       'icon' => 'github'
     );
+  }
+
+  /**
+   * Initialize the module - ready
+   *
+   * ProcessWire calls this when the module is loaded. For 'autoload' modules, this will be called
+   * when ProcessWire's API is ready. As a result, this is a good place to attach hooks.
+   *
+   * @see http://processwire.com/apigen/class-Module.html
+   */
+  public function ready() {
+    $this->addHookBefore('InputfieldSelect::render', $this, 'getSelectableRepositories');
+    $this->addHookBefore('ProcessPageEdit::processInput', $this, 'autofillFields');
+  }
+
+  /**
+   * Autofill Fields
+   *
+   * @param HookEvent $event
+   */
+  public function autofillFields(HookEvent $event) {
+    $repo = $this->input->post->{$this->fieldSelect};
+    if ($repo) {
+      if ($this->fieldTeaser) {
+        $repoData = $this->callApi(self::API_REPOS . $repo);
+        $this->input->post->{$this->fieldTeaser} = $repoData['description'];
+      }
+
+      $data = $this->callApi(self::API_REPOS . $repo . '/readme');
+      $this->input->post->{$this->fieldPlain} = $repo;
+      $this->input->post->{$this->fieldBody} = base64_decode($data['content']);
+    }
+  }
+
+  /**
+   * Get Selectable Repositories by Organization
+   *
+   * @param HookEvent $event
+   */
+  public function getSelectableRepositories(HookEvent $event) {
+    $field = $event->object;
+    if ($field->name !== $this->fieldSelect) return;
+
+    // empty field? show selectable repositories
+    if (!$field->value) {
+      $data = $this->callApi(sprintf(self::API_ORGS, $this->organization));
+
+      if ($data) {
+        foreach ($data as $repo) $field->addOption($repo['full_name'], $repo['name']);
+
+        $page = $this->pages->get($this->input->get->id);
+        $page->of(false);
+        $page->save($this->fieldSelect);
+        $page->of(true);
+      }
+    }
+  }
+
+  /**
+   * Call Api
+   *
+   * @param string $url
+   * @return array
+   */
+  private function callApi($url) {
+    $connection = new WireHttp;
+    $connection->setHeader('User-Agent:', ucfirst($this->organization) . '-App');
+    $connection->set('access_token', $this->accessToken);
+    $data = $connection->getJSON($url, true);
+
+    return $data;
   }
 
   /**
@@ -110,4 +178,5 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
       $this->session->redirect($this->redirectUri);
     }
   }
+
 }
