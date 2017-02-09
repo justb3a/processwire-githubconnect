@@ -5,7 +5,7 @@
  * Licensed under GNU/GPL v2, see LICENSE.TXT
  *
  * @author Tabea David <info@justonestep.de>
- * @version 0.0.2
+ * @version 0.0.3
  * @copyright Copyright (c) 2017 justonestep.de, <info@justonestep.de>
  * @see https://github.com/justonestep/processwire-githubconnect
  * @see http://www.processwire.com
@@ -20,6 +20,9 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
   const API_ACCESS_TOKEN = 'https://github.com/login/oauth/access_token';
   const API_REPOS = 'https://api.github.com/repos/';
   const API_ORGS = 'https://api.github.com/orgs/%s/repos';
+  const API_FILES = 'https://api.github.com/repos/%s/git/trees/master';
+  const API_FILE = 'https://api.github.com/repos/%s/git/blobs/%s';
+
 
   /**
    * Retrieves module meta data
@@ -32,7 +35,7 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
     return array(
       'title' => 'Github Connect',
       'summary' => 'ProcessWire module to connect a Github OAuth application. ',
-      'version' => 002,
+      'version' => 003,
       'href' => 'https://github.com/justonestep/processwire-githubconnect',
       'singular' => true,
       'autoload' => true,
@@ -59,15 +62,24 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
    * @param HookEvent $event
    */
   public function autofillFields(HookEvent $event) {
-    $repo = $this->input->post->{$this->fieldSelect};
-    if ($repo) {
-      if ($this->fieldTeaser) {
-        $repoData = $this->callApi(self::API_REPOS . $repo);
+    $form = $event->arguments(0);
+    $repository = $this->input->post->{$this->fieldSelect};
+    $sha = $this->input->post->{$this->fieldSubSelect};
+    $sublist = $form->get($this->fieldSubSelect);
+
+    if ($repository) {
+      if ($this->fieldTeaser && !$sublist) {
+        $repoData = $this->callApi(self::API_REPOS . $repository);
         $this->input->post->{$this->fieldTeaser} = $repoData['description'];
       }
 
-      $data = $this->callApi(self::API_REPOS . $repo . '/readme');
-      $this->input->post->{$this->fieldPlain} = $repo;
+      $data = $this->callApi(self::API_REPOS . $repository . '/readme');
+      $this->input->post->{$this->fieldPlain} = $repository;
+      if (!$sublist) $this->input->post->{$this->fieldBody} = base64_decode($data['content']);
+    } elseif ($sublist && $sha) {
+      $repository = $form->get($this->fieldPlain)->value;
+
+      $data = $this->callApi(sprintf(self::API_FILE, $repository, $sha));
       $this->input->post->{$this->fieldBody} = base64_decode($data['content']);
     }
   }
@@ -79,20 +91,44 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
    */
   public function getSelectableRepositories(HookEvent $event) {
     $field = $event->object;
-    if ($field->name !== $this->fieldSelect) return;
 
-    // empty field? show selectable repositories
-    if (!$field->value) {
-      $data = $this->callApi(sprintf(self::API_ORGS, $this->organization));
+    switch ($field->name) {
+      case $this->fieldSelect:
+        $this->addRepositoriesAsOptions($field);
+        break;
+      case $this->fieldSubSelect:
+        $this->addFilesAsOptions($field);
+        break;
+    }
+  }
 
-      if ($data) {
-        foreach ($data as $repo) $field->addOption($repo['full_name'], $repo['name']);
+  private function addRepositoriesAsOptions($field) {
+    $page = $this->pages->get($this->input->get->id);
+    $data = $this->callApi(sprintf(self::API_ORGS, $this->organization));
 
-        $page = $this->pages->get($this->input->get->id);
-        $page->of(false);
-        $page->save($this->fieldSelect);
-        $page->of(true);
+    if ($data) {
+      foreach ($data as $repo) $field->addOption($repo['full_name'], $repo['name']);
+      $page->of(false);
+      $page->save($this->fieldSelect);
+      $page->of(true);
+    }
+  }
+
+  private function addFilesAsOptions($field) {
+    $page = $this->pages->get($this->input->get->id);
+    $form = $field->get('parent');
+    $repository = $form->get($this->fieldPlain)->value;
+
+    if ($this->fieldSubSelect && $repository) {
+      $data = $this->callApi(sprintf(self::API_FILES, $repository));
+      foreach ($data['tree'] as $f) {
+        if ($f['path'] === 'LICENSE') continue;
+        $field->addOption($f['sha'], $f['path']);
       }
+
+      $page->of(false);
+      $page->save($this->fieldSubSelect);
+      $page->of(true);
     }
   }
 
