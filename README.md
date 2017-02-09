@@ -49,18 +49,28 @@ Assign the created fields in module settings.
 
 ```php
 $github = $modules->get('GithubConnect');
-$result = $github->getRepository('owner/repository');
+$github->setRepository('owner/repository');
+$result = $github->getRepositoryInformations();
 ```
 
-### Get Repository
+### Set the Repository
+
+You can set a repository initially. So you don't have to pass it every time.
+
+`$github->setRepository('owner/repository');`
+
+- params
+  - name of repository, scheme: `:owner/:repo` (string)
+
+### Get Repository Informations
 
 Get informations about a repository.
 
-`$github->getRepository($repo);`
+`$github->getRepositoryInformations($repo);`
 
 - see [Github Api](https://developer.github.com/v3/repos/#get) (to get the complete documentation and an example response)
 - params
-  - name of repository, scheme: `:owner/:repo` (string)
+  - **optional** name of repository, scheme: `:owner/:repo` (string)
 - return array
 
 ### Get the readme
@@ -71,7 +81,7 @@ Get informations about the README file.
 
 - see [Github Api](https://developer.github.com/v3/repos/contents/#get-the-readme) (to get the complete documentation and an example response) 
 - params
-  - name of repository, scheme: `:owner/:repo` (string)
+  - **optional** name of repository, scheme: `:owner/:repo` (string)
 - return array
 
 ### Get the content
@@ -91,31 +101,31 @@ Get base64 decoded content of a the README.
 `$github->getReadmeContent($repo);`
 
 - params
-  - name of repository, scheme: `:owner/:repo` (string)
+  - **optional** name of repository, scheme: `:owner/:repo` (string)
 - return string
 
 ### Get certain file
 
 Get informations about a certain file.
 
-`$github->getFile($repo, $filename);`
+`$github->getFile($filename, $repo);`
 
 - see [Github Api](https://developer.github.com/v3/repos/contents/#get-contents) (to get the complete documentation and an example response) 
 - params
-  - name of repository, scheme: `:owner/:repo` (string)
   - filename
+  - **optional** name of repository, scheme: `:owner/:repo` (string)
 - return array
 
 ### Get content of certain file
 
 Get base64 decoded content of a certain file.
 
-`$github->getContentOfAFile($repo, $filename);`
+`$github->getContentOfAFile($filename, $repo);`
 
 - see [Github Api](https://developer.github.com/v3/repos/contents/#get-contents) (to get the complete documentation and an example response) 
 - params
-  - name of repository, scheme: `:owner/:repo` (string)
   - filename
+  - **optional** name of repository, scheme: `:owner/:repo` (string)
 - return string
 
 ### List repositories for the specified org
@@ -138,11 +148,11 @@ Every time you save a file with git, it creates a unique ID (a.k.a. the "SHA" or
 that allows you to keep record of what changes were made when and by who.
 Instead of a sha you can also use the name of a branch.
 
-`$github->getTree($repo, $sha, $recursive);`
+`$github->getTree($sha, $recursive, $repo);`
 
 - see [Github Api](https://developer.github.com/v3/git/trees/#get-a-tree) (to get the complete documentation and an example response) 
 - params
-  - name of repository, scheme: `:owner/:repo` (string)
   - **optional** sha defaults to branch `master`
   - **optional** recursive defaults to `true`
+  - **optional** name of repository, scheme: `:owner/:repo` (string)
 - return array

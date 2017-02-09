@@ -21,6 +21,7 @@ class GithubConnectConfig extends ModuleConfig {
       'redirectUri' => $redirectUri,
       'organization' => '',
       'accessToken' => '',
+      'beImport' => false,
       'fieldSelect' => '',
       'fieldSubSelect' => '',
       'fieldPlain' => '',
