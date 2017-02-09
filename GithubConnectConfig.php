@@ -21,6 +21,7 @@ class GithubConnectConfig extends ModuleConfig {
       'redirectUri' => $redirectUri,
       'organization' => '',
       'accessToken' => '',
+      'beImport' => false,
       'fieldSelect' => '',
       'fieldSubSelect' => '',
       'fieldPlain' => '',
@@ -91,77 +92,92 @@ EOD;
     $field->collapsed = Inputfield::collapsedNoLocked;
     $inputfields->add($field);
 
+    // FIELDSET
+    $fieldset = $this->modules->get('InputfieldFieldset');
+    $fieldset->label = __('General');
+
+    // field beImport
+    $field = $this->modules->get('InputfieldCheckbox');
+    $field->name = 'beImport';
+    $field->label = __('Enable Backend Import Features');
+    $field->value = 1;
+    $fieldset->add($field);
+
     // field fieldSelect
     $field = $this->modules->get('InputfieldSelect');
-    $field->label = __('Select list Github repositories');
+    $field->label = __('(1) Select list Github repositories');
     $field->description = __('Field which should be filled with Github repositories.');
-    $field->notes = __('Type Option, all fields must be added to the same template.');
+    $field->notes = __('Type Option.');
     $field->attr('name', 'fieldSelect');
-    $field->columnWidth = 25;
-    $field->required = 1;
-    $field->requiredIf = "clientSecret!=''";
+    $field->columnWidth = 33;
+    $field->showIf = 'beImport=1';
     foreach ($this->fields as $f) {
       if (!$f->type instanceof \ProcessWire\FieldtypeOptions) continue;
       $field->addOption($f->name, $f->name);
     }
-    $inputfields->add($field);
+    $fieldset->add($field);
 
     // field fieldPlain
     $field = $this->modules->get('InputfieldSelect');
-    $field->label = __('Selected Github repository');
+    $field->label = __('(2) Selected Github repository');
     $field->description = __('Field which should store the selected Github repository.');
-    $field->notes = __('Type Text, all fields must be added to the same template.');
+    $field->notes = __('Type Text.');
     $field->attr('name', 'fieldPlain');
-    $field->columnWidth = 25;
+    $field->columnWidth = 33;
+    $field->showIf = 'beImport=1';
     $field->required = 1;
-    $field->requiredIf = "clientSecret!=''";
+    $field->requiredIf = 'beImport=1';
     foreach ($this->fields as $f) {
       if (!$f->type instanceof \ProcessWire\FieldtypeText || $f->type instanceof \ProcessWire\FieldtypeTextarea) continue;
       $field->addOption($f->name, $f->name);
     }
-    $inputfields->add($field);
+    $fieldset->add($field);
 
     // field fieldTeaser
     $field = $this->modules->get('InputfieldSelect');
-    $field->label = __('Teaser Text');
+    $field->label = __('(3) Teaser Text');
     $field->description = __('Field which should contain the imported `description` content.');
-    $field->notes = __('Type Textarea, all fields must be added to the same template.');
+    $field->notes = __('Type Textarea.');
     $field->attr('name', 'fieldTeaser');
-    $field->columnWidth = 25;
+    $field->columnWidth = 34;
+    $field->showIf = 'beImport=1';
     foreach ($this->fields as $f) {
       if (!$f->type instanceof \ProcessWire\FieldtypeTextarea) continue;
       $field->addOption($f->name, $f->name);
     }
-    $inputfields->add($field);
+    $fieldset->add($field);
 
     // field fieldBody
     $field = $this->modules->get('InputfieldSelect');
-    $field->label = __('Body Text');
+    $field->label = __('(4) Body Text');
     $field->description = __('Field which should contain the imported `readme`-file content.');
-    $field->notes = __('Type Textarea, all fields must be added to the same template.');
+    $field->notes = __('Type Textarea.');
     $field->attr('name', 'fieldBody');
-    $field->columnWidth = 25;
+    $field->columnWidth = 33;
+    $field->showIf = 'beImport=1';
     $field->required = 1;
-    $field->requiredIf = "clientSecret!=''";
+    $field->requiredIf = 'beImport=1';
     foreach ($this->fields as $f) {
       if (!$f->type instanceof \ProcessWire\FieldtypeTextarea) continue;
       $field->addOption($f->name, $f->name);
     }
-    $inputfields->add($field);
+    $fieldset->add($field);
 
     // field fieldSubSelect
     $field = $this->modules->get('InputfieldSelect');
-    $field->label = __('Select list repositories files');
+    $field->label = __('(5) Select list repositories files');
     $field->description = __('Field which should be filled with files of a Github repositories.');
-    $field->notes = __('Type Option, all fields must be added to the same template.');
+    $field->notes = __('Type Option.');
     $field->attr('name', 'fieldSubSelect');
-    $field->columnWidth = 25;
+    $field->columnWidth = 33;
+    $field->showIf = 'beImport=1';
     foreach ($this->fields as $f) {
       if (!$f->type instanceof \ProcessWire\FieldtypeOptions) continue;
       $field->addOption($f->name, $f->name);
     }
-    $inputfields->add($field);
+    $fieldset->add($field);
 
+    $inputfields->add($fieldset);
 
     return $inputfields;
   }

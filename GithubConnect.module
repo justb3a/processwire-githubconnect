@@ -1,11 +1,11 @@
 <?php namespace ProcessWire;
 
 /**
- * GithubConnect See README.md for usage instructions.  ProcessWire 3.x
+ * GithubConnect See README.md for usage instructions. ProcessWire 3.x
  * Licensed under GNU/GPL v2, see LICENSE.TXT
  *
  * @author Tabea David <info@justonestep.de>
- * @version 0.0.3
+ * @version 0.0.4
  * @copyright Copyright (c) 2017 justonestep.de, <info@justonestep.de>
  * @see https://github.com/justonestep/processwire-githubconnect
  * @see http://www.processwire.com
@@ -20,9 +20,11 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
   const API_ACCESS_TOKEN = 'https://github.com/login/oauth/access_token';
   const API_REPOS = 'https://api.github.com/repos/';
   const API_ORGS = 'https://api.github.com/orgs/%s/repos';
-  const API_FILES = 'https://api.github.com/repos/%s/git/trees/master';
-  const API_FILE = 'https://api.github.com/repos/%s/git/blobs/%s';
+  const API_FILES = 'https://api.github.com/repos/%s/git/trees/%s';
+  const API_FILES_RECURSIVE = 'https://api.github.com/repos/%s/git/trees/%s?recursive=1';
+  const API_FILE = 'https://api.github.com/repos/%s/contents/%s';
 
+  protected $repository = '';
 
   /**
    * Retrieves module meta data
@@ -35,7 +37,7 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
     return array(
       'title' => 'Github Connect',
       'summary' => 'ProcessWire module to connect a Github OAuth application. ',
-      'version' => 003,
+      'version' => 004,
       'href' => 'https://github.com/justonestep/processwire-githubconnect',
       'singular' => true,
       'autoload' => true,
@@ -52,8 +54,162 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
    * @see http://processwire.com/apigen/class-Module.html
    */
   public function ready() {
-    $this->addHookBefore('InputfieldSelect::render', $this, 'getSelectableRepositories');
-    $this->addHookBefore('ProcessPageEdit::processInput', $this, 'autofillFields');
+    if ($this->beImport) {
+      $this->addHookBefore('InputfieldSelect::render', $this, 'getSelectableRepositories');
+      $this->addHookBefore('ProcessPageEdit::processInput', $this, 'autofillFields');
+    }
+  }
+
+  /**
+   * Call Api
+   *
+   * @param string $url
+   * @return array
+   */
+  private function callApi($url) {
+    $connection = new WireHttp;
+    $connection->setHeader('User-Agent:', ucfirst($this->organization) . '-App');
+    $connection->set('access_token', $this->accessToken);
+    $data = $connection->getJSON($url, true);
+
+    // handle error
+    if ($connection->getHttpCode() !== 200) $this->handleError("Not found: `$url`");
+
+    return $data;
+  }
+
+  /**
+   * Handle error
+   *
+   * @param string $msg
+   */
+  private function handleError($msg) {
+    if ($this->config->debug) throw new WireException($msg);
+    $this->log->error($msg);
+    $this->error($msg);
+  }
+
+  /**
+   * Set Repository
+   * also check if it`s a existing repository
+   *
+   * @param string $repository
+   */
+  public function setRepository($repository) {
+    if ($this->getRepositoryInformations($repository)) {
+      $this->repository = $repository;
+    }
+  }
+
+  /**
+   * Set Repository
+   *
+   * @param string $repository
+   */
+  public function getRepository($repo) {
+    $repository = $repo ? $repo : $this->repository;
+    if (!$repository) $this->handleError("Not found: You've to provide a repository.");
+    return $repository;
+  }
+
+  /**
+   * Endpoint Get Repository
+   * @see: https://developer.github.com/v3/repos/#get
+   *
+   * @param string $repository name of repository, scheme: `:owner/:repo`
+   * @return array
+   */
+  public function getRepositoryInformations($repository = '') {
+    return $this->callApi(self::API_REPOS . $this->getRepository($repository));
+  }
+
+  /**
+   * Endpoint Get the readme
+   * @see: https://developer.github.com/v3/repos/contents/#get-the-readme
+   *
+   * @param string $repository name of repository, scheme: `:owner/:repo`
+   * @return array
+   */
+  public function getReadme($repository = '') {
+    return $this->callApi(self::API_REPOS . $this->getRepository($repository) . '/readme');
+  }
+
+  /**
+   * Endpoint Get the content
+   *
+   * @param array $data
+   * @return string
+   */
+  public function getContent($data) {
+    if (!is_array($data) || !array_key_exists('content', $data)) $this->handleError('The data transferred is not valid `getContent()`.');
+    return base64_decode($data['content']);
+  }
+
+  /**
+   * Endpoint Get the readme content
+   *
+   * @param string $repository name of repository, scheme: `:owner/:repo`
+   * @return string
+   */
+  public function getReadmeContent($repository = '') {
+    $data = $this->getReadme($repository);
+    return $this->getContent($data);
+  }
+
+  /**
+   * Endpoint Get certain file
+   * @see: https://developer.github.com/v3/repos/contents/#get-contents
+   *
+   * @param string $filename
+   * @param string $repository name of repository, scheme: `:owner/:repo`
+   * @return array
+   */
+  public function getFile($filename, $repository = '') {
+    return $this->callApi(sprintf(self::API_FILE, $this->getRepository($repository), $filename));
+  }
+
+  /**
+   * Endpoint Get content of certain file
+   * @see: https://developer.github.com/v3/repos/contents/#get-contents
+   *
+   * @param string $filename
+   * @param string $repository name of repository, scheme: `:owner/:repo`
+   * @return string
+   */
+  public function getContentOfAFile($filename, $repository = '') {
+    $data = $this->getFile($filename, $repository);
+    return $this->getContent($data);
+  }
+
+  /**
+   * Endpoint List repositories for the specified org
+   * @see: https://developer.github.com/v3/repos/#list-organization-repositories
+   *
+   * @param string $org
+   * @return array
+   */
+  public function listRepositoriesByOrg($org = '') {
+    $organization = $org ? $org : $this->organization;
+    return $this->callApi(sprintf(self::API_ORGS, $organization));
+  }
+
+  /**
+   * Endpoint Get a Tree
+   * @see: https://developer.github.com/v3/git/trees/#get-a-tree
+   *
+   * A sha, or "hash", is an individual change to a file.
+   * Every time you save a file with git, it creates a unique ID (a.k.a. the "SHA" or "hash")
+   * that allows you to keep record of what changes were made when and by who.
+   * Instead of a sha you can also use the name of a branch.
+   *
+   * @param string $sha defaults to branch `master`
+   * @param boolen $recursive defaults to `true`
+   * @param string $repository name of repository, scheme: `:owner/:repo`
+   * @return array
+   */
+  public function getTree($sha = 'master', $recursive = true, $repository = '') {
+    $apiUrl = $recursive ? self::API_FILES_RECURSIVE : self::API_FILES;
+    return $this->callApi(sprintf($apiUrl, $this->getRepository($repository), $sha));
   }
 
   /**
@@ -64,23 +220,20 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
   public function autofillFields(HookEvent $event) {
     $form = $event->arguments(0);
     $repository = $this->input->post->{$this->fieldSelect};
-    $sha = $this->input->post->{$this->fieldSubSelect};
+    $filename = $this->input->post->{$this->fieldSubSelect};
     $sublist = $form->get($this->fieldSubSelect);
 
     if ($repository) {
       if ($this->fieldTeaser && !$sublist) {
-        $repoData = $this->callApi(self::API_REPOS . $repository);
+        $repoData = $this->getRepositoryInformations($repository);
         $this->input->post->{$this->fieldTeaser} = $repoData['description'];
       }
 
-      $data = $this->callApi(self::API_REPOS . $repository . '/readme');
       $this->input->post->{$this->fieldPlain} = $repository;
-      if (!$sublist) $this->input->post->{$this->fieldBody} = base64_decode($data['content']);
-    } elseif ($sublist && $sha) {
+      if (!$sublist) $this->input->post->{$this->fieldBody} = $this->getReadmeContent($repository);
+    } elseif ($sublist && $filename) {
       $repository = $form->get($this->fieldPlain)->value;
-
-      $data = $this->callApi(sprintf(self::API_FILE, $repository, $sha));
-      $this->input->post->{$this->fieldBody} = base64_decode($data['content']);
+      $this->input->post->{$this->fieldBody} = $this->getContentOfAFile($filename, $repository);
     }
   }
 
@@ -102,9 +255,14 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
     }
   }
 
+  /**
+   * Add repositories as selectable options
+   *
+   * @param InputfieldSelect $field
+   */
   private function addRepositoriesAsOptions($field) {
     $page = $this->pages->get($this->input->get->id);
-    $data = $this->callApi(sprintf(self::API_ORGS, $this->organization));
+    $data = $this->listRepositoriesByOrg();
 
     if ($data) {
       foreach ($data as $repo) $field->addOption($repo['full_name'], $repo['name']);
@@ -114,37 +272,28 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
     }
   }
 
+  /**
+   * Add files as selectable options
+   *
+   * @param InputfieldSelect $field
+   */
   private function addFilesAsOptions($field) {
     $page = $this->pages->get($this->input->get->id);
     $form = $field->get('parent');
     $repository = $form->get($this->fieldPlain)->value;
+    $this->setRepository($repository);
 
     if ($this->fieldSubSelect && $repository) {
-      $data = $this->callApi(sprintf(self::API_FILES, $repository));
+      $data = $this->getTree();
       foreach ($data['tree'] as $f) {
-        if ($f['path'] === 'LICENSE') continue;
-        $field->addOption($f['sha'], $f['path']);
+        if ($f['path'] === 'LICENSE' || $f['type'] === 'tree') continue;
+        $field->addOption($f['path'], $f['path']);
       }
 
       $page->of(false);
       $page->save($this->fieldSubSelect);
       $page->of(true);
     }
-  }
-
-  /**
-   * Call Api
-   *
-   * @param string $url
-   * @return array
-   */
-  private function callApi($url) {
-    $connection = new WireHttp;
-    $connection->setHeader('User-Agent:', ucfirst($this->organization) . '-App');
-    $connection->set('access_token', $this->accessToken);
-    $data = $connection->getJSON($url, true);
-
-    return $data;
   }
 
   /**
