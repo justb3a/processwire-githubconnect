@@ -54,9 +54,10 @@ class GithubConnect extends WireData implements Module, ConfigurableModule {
    * @see http://processwire.com/apigen/class-Module.html
    */
   public function ready() {
-    // @todo: add checkbox, if enabled
-    $this->addHookBefore('InputfieldSelect::render', $this, 'getSelectableRepositories');
-    $this->addHookBefore('ProcessPageEdit::processInput', $this, 'autofillFields');
+    if ($this->beImport) {
+      $this->addHookBefore('InputfieldSelect::render', $this, 'getSelectableRepositories');
+      $this->addHookBefore('ProcessPageEdit::processInput', $this, 'autofillFields');
+    }
   }
 
   /**
