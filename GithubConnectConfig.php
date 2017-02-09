@@ -22,6 +22,7 @@ class GithubConnectConfig extends ModuleConfig {
       'organization' => '',
       'accessToken' => '',
       'fieldSelect' => '',
+      'fieldSubSelect' => '',
       'fieldPlain' => '',
       'fieldTeaser' => '',
       'fieldBody' => ''
@@ -147,6 +148,20 @@ EOD;
       $field->addOption($f->name, $f->name);
     }
     $inputfields->add($field);
+
+    // field fieldSubSelect
+    $field = $this->modules->get('InputfieldSelect');
+    $field->label = __('Select list repositories files');
+    $field->description = __('Field which should be filled with files of a Github repositories.');
+    $field->notes = __('Type Option, all fields must be added to the same template.');
+    $field->attr('name', 'fieldSubSelect');
+    $field->columnWidth = 25;
+    foreach ($this->fields as $f) {
+      if (!$f->type instanceof \ProcessWire\FieldtypeOptions) continue;
+      $field->addOption($f->name, $f->name);
+    }
+    $inputfields->add($field);
+
 
     return $inputfields;
   }
